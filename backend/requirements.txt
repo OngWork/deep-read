@@ -1,7 +1,9 @@
 fastapi
 uvicorn
+python-multipart
 langchain
 langchain-community
-chromadb  
+langchain-ollama
+langchain-chroma
 pypdf
-ollama    
+langsmith
