@@ -1,9 +1,10 @@
 fastapi
 uvicorn
 python-multipart
-langchain
+boto3
+langchain-aws
+langchain-pinecone
 langchain-community
-langchain-ollama
-langchain-chroma
+langchain-text-splitters
+langchain-core
 pypdf
-langsmith
