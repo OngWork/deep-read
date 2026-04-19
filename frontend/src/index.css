@@ -1,0 +1,8 @@
+@import "tailwindcss";
+
+/* To make the app full screen */
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}

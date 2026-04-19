@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+python-multipart
+boto3
+langchain-aws
+langchain-pinecone
+langchain-community
+langchain-text-splitters
+langchain-core
+pypdf
