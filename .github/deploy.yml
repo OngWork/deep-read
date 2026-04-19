@@ -1,0 +1,49 @@
+name: Deploy Backend to EC2
+
+on:
+  push:
+    branches: [ main ] # run only when pushing to main branch
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-southeast-2
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build, tag, and push image to Amazon ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: deepread-backend
+          IMAGE_TAG: latest
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG ./backend
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+      - name: Deploy to EC2 via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            aws ecr get-login-password --region ap-southeast-2 | docker login --username AWS --password-stdin 011939520964.dkr.ecr.ap-southeast-2.amazonaws.com
+            docker pull 011939520964.dkr.ecr.ap-southeast-2.amazonaws.com/deepread-backend:latest
+            docker stop deepread-api || true
+            docker rm deepread-api || true
+            docker run -d --name deepread-api -p 8000:8000 \
+              -e S3_BUCKET_NAME=${{ secrets.S3_BUCKET_NAME }} \
+              -e PINECONE_API_KEY=${{ secrets.PINECONE_API_KEY }} \
+              -e AWS_REGION=ap-southeast-2 \
+              011939520964.dkr.ecr.ap-southeast-2.amazonaws.com/deepread-backend:latest
