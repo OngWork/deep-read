@@ -10,5 +10,5 @@ Storage -- AWS S3\
 DevOps -- Docker, Docker Compose, AWS ECR, AWS EC2\
 Prerequisites:\
 Docker & Docker Compose\
-AWS Account (พร้อมสิทธิ์ Bedrock Llama 3)\
+AWS Account\
 Pinecone API Key
