@@ -11,7 +11,7 @@ import boto3
 import json
 import tempfile
 
-# ตั้งค่าการเชื่อมต่อ S3
+# configure AWS S3 client
 s3_client = boto3.client(
     's3',
     aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
@@ -22,7 +22,7 @@ s3_client = boto3.client(
 BUCKET_NAME = os.getenv('S3_BUCKET_NAME')
 
 embeddings = PineconeEmbeddings(
-    model="multilingual-e5-large", # ต้องชื่อเดียวกับที่เลือกในหน้าเว็บ Pinecone
+    model="multilingual-e5-large", 
     pinecone_api_key=os.getenv("PINECONE_API_KEY")
 )
 
@@ -59,21 +59,21 @@ async def upload_file(file: UploadFile = File(...)):
 @app.post("/process-s3-file")
 async def process_s3_file(filename: str):
     try:
-        # 1. สร้างไฟล์ชั่วคราวใน Container
+        # 1. create a temporary file to store the downloaded PDF 
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
-            # 2. ดาวน์โหลดไฟล์จาก S3 มาลงที่ไฟล์ชั่วคราว
+            # 2. download the file from S3 to the temporary location
             s3_client.download_fileobj(BUCKET_NAME, filename, tmp_file)
             tmp_path = tmp_file.name
 
-        # 3. ใช้ PyPDFLoader อ่าน (ตัวนี้เบามาก ไม่ต้องใช้ torch)
+        # 3. use PyPDFLoader to load the PDF 
         loader = PyPDFLoader(tmp_path)
         docs = loader.load()
 
-        # 4. หั่นข้อความ
+        # 4. split the documents into smaller chunks
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
         splits = text_splitter.split_documents(docs)
         
-        # 5. ส่งไป Pinecone (Integrated Embeddings)
+        # 5. Send to Pinecone (Integrated Embeddings)
         PineconeVectorStore.from_documents(
             documents=splits,
             index_name="deepread-index",
@@ -81,13 +81,12 @@ async def process_s3_file(filename: str):
             pinecone_api_key=os.getenv("PINECONE_API_KEY")
         )
 
-        # ลบไฟล์ชั่วคราวหลังทำเสร็จ
         os.remove(tmp_path)
         
-        print(f"✅ Indexed {filename} to Pinecone successfully (Using PyPDF)")
+        print(f"Indexed {filename} to Pinecone successfully (Using PyPDF)")
         return {"status": "Success"}
     except Exception as e:
-        print(f"❌ Error in process: {str(e)}")
+        print(f"Error in process: {str(e)}")
         return {"status": "Error", "message": str(e)}
 
 @app.post("/chat")
@@ -96,26 +95,26 @@ async def chat(query: str = Form(...), history: str = Form("[]")):
         print(f"--- New Chat Request ---")
         print(f"Query: {query}")
         
-        # 1. รับ history
+        # 1. history
         chat_history = json.loads(history)
         
-        # 2. เชื่อมต่อ Pinecone
+        # 2. Connect to Pinecone
         print("Connecting to Pinecone...")
         vectorstore = PineconeVectorStore(
             index_name="deepread-index", 
-            embedding=embeddings, # เพิ่มบรรทัดนี้
+            embedding=embeddings, 
             pinecone_api_key=os.getenv("PINECONE_API_KEY")
         )
         
-        # 3. ค้นหาข้อมูล (จุดที่มักจะค้างถ้าข้อมูลว่าง)
+        # 3. Find relevant documents from Pinecone
         print("Searching for context...")
         docs = vectorstore.similarity_search(query, k=4)
         print(f"Found {len(docs)} relevant documents")
         
         if not docs:
-            return {"answer": "ยังไม่มีข้อมูลในระบบ กรุณาอัปโหลดไฟล์และกด Process ก่อนครับ", "sources": []}
+            return {"answer": "There is no relevant information available.", "sources": []}
 
-        # 4. เรียกใช้ LLM
+        # 4. Call LLM
         print("Invoking Llama 3 on Bedrock...") 
         context_text = "\n\n".join([doc.page_content for doc in docs])
         full_prompt = f"History: {chat_history}\n\nContext: {context_text}\n\nQuestion: {query}"
@@ -139,5 +138,5 @@ async def chat(query: str = Form(...), history: str = Form("[]")):
             "sources": sources
         }
     except Exception as e:
-        print(f"❌ ERROR in /chat: {str(e)}") 
+        print(f"ERROR in /chat: {str(e)}") 
         return {"status": "Error", "message": str(e)}
