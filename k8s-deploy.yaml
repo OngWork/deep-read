@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deepread-backend
+spec:
+  replicas: 2 # number of pod replicas for high availability
+  selector:
+    matchLabels:
+      app: deepread-api
+  template:
+    metadata:
+      labels:
+        app: deepread-api
+    spec:
+      containers:
+      - name: backend
+        image: #your-ecr-repository-url/deepread-backend:latest
+        ports:
+        - containerPort: 8000
+        env:
+        - name: S3_BUCKET_NAME
+          valueFrom:
+            secretKeyRef:
+              name: deepread-secrets
+              key: S3_BUCKET_NAME
+        - name: PINECONE_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: deepread-secrets
+              key: PINECONE_API_KEY
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: deepread-service
+spec:
+  selector:
+    app: deepread-api
+  ports:
+    - protocol: TCP
+      port: 8000 # port for external access
+      targetPort: 8000 # port on the container
